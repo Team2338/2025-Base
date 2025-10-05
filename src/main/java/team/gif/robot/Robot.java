@@ -34,8 +34,8 @@ public class Robot extends TimedRobot {
 
     public static UI ui;
 
-    public static final boolean enableSwerveDebug = false;
-    public static final boolean fullDashboard = false;
+    public static final boolean enableSwerveDebug = true;
+    public static final boolean fullDashboard = true;
 
 
     /**
@@ -53,6 +53,7 @@ public class Robot extends TimedRobot {
 //        swerveConfig = new SwerveConfiguration(new RobotMap.Mk3Map(), new Constants.Mk3Constants(), SparkMaxDriveMotor::new, TalonSRXTurnMotorEncoder::new, null);
         swerveDrive = new SwerveDrivetrain(swerveConfig);
         swerveDrive.setDefaultCommand(new DriveSwerve());
+        swerveDrive.enableDebugMode();
 //        swerveDrive.addLimelight("limelight-front");
 
         //These should be at or near the bottom

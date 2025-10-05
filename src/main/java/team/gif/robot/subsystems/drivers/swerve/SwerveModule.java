@@ -25,6 +25,9 @@ public class SwerveModule {
 
     private final double maxDriveTemp;
 
+    private double targetAngle = 0;
+    private double targetVelocity = 0;
+
     public SwerveModule(
             DriveMotor driveMotor,
             TurnMotor turnMotor,
@@ -96,6 +99,20 @@ public class SwerveModule {
         return encoder.getDegrees() - turnOffset;
     }
 
+    /**
+     * @return The target angle of the module in radians as a double
+     */
+    public double getTargetAngle() {
+        return targetAngle;
+    }
+
+    /**
+     * Get the target velocity of the swerve module
+     * @return The target velocity of the module in meters per second as a double
+     */
+    public double getTargetVelocity() {
+        return targetVelocity;
+    }
     /**
      * Reset the wheel to its 0 positions
      */
@@ -172,8 +189,12 @@ public class SwerveModule {
      */
     public void setDesiredState(SwerveModuleState state) {
         SwerveModuleState stateOptimized = optimizeState(state);
+        targetAngle = stateOptimized.angle.getRadians();
+        targetVelocity = stateOptimized.speedMetersPerSecond;
+
         double driveOutput = driveFF.calculate(stateOptimized.speedMetersPerSecond);
         final double error = getTurningHeading() - stateOptimized.angle.getRadians();
+
 
         //if error is negative, FF should also be negative
         final double ff = turnFF * Math.abs(error) / error;
@@ -185,6 +206,8 @@ public class SwerveModule {
 
     public void setDesiredState(SwerveModuleState state,  boolean moveCW) {
         state = optimizeState(state);
+        targetAngle = state.angle.getRadians();
+        targetVelocity = state.speedMetersPerSecond;
         double driveOutput = driveFF.calculate(state.speedMetersPerSecond);
 
         double error = getTurningHeading() - state.angle.getRadians();

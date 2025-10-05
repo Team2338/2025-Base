@@ -11,6 +11,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructArrayPublisher;
 import edu.wpi.first.networktables.StructPublisher;
@@ -19,6 +20,8 @@ import edu.wpi.first.units.measure.MutAngularVelocity;
 import edu.wpi.first.units.measure.MutDistance;
 import edu.wpi.first.units.measure.MutLinearVelocity;
 import edu.wpi.first.units.measure.MutVoltage;
+import edu.wpi.first.util.sendable.Sendable;
+import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -76,6 +79,8 @@ public class SwerveDrivetrain extends SubsystemBase {
 
     public boolean limelightEnabled = true;
     public String[] limelightNames = new String[] {};
+    
+    public boolean debugMode = false;
 
     // Network Table publishers for the swerve
     // states so that we can use them in advantage scope
@@ -135,9 +140,9 @@ public class SwerveDrivetrain extends SubsystemBase {
             }
         }
 
-        if (Robot.fullDashboard) {
+        if (debugMode) {
             posePublisher.set(poseEstimator.getEstimatedPosition());
-            updateShuffleboardDebug("Swerve");
+            updateShuffleboardDebug();
         }
     }
 
@@ -197,7 +202,7 @@ public class SwerveDrivetrain extends SubsystemBase {
 
         ChassisSpeeds speed = constants.DRIVE_KINEMATICS.toChassisSpeeds(frontLeftState, frontRightState, rearLeft, rearRight);
 
-        if (Robot.fullDashboard) {
+        if (debugMode) {
             chassisSpeedsStructPublisher.set(speed);
         }
 
@@ -217,7 +222,7 @@ public class SwerveDrivetrain extends SubsystemBase {
                         drivePace.getIsFieldRelative() ?
                                 ChassisSpeeds.fromFieldRelativeSpeeds(x, y, rot, Robot.pigeon.getRotation2d())
                                 : new ChassisSpeeds(x, y, rot));
-        if (Robot.fullDashboard) {
+        if (debugMode) {
             SwerveModuleState[] actualStates = { fL.getState(), fR.getState(), rL.getState(), rR.getState()};
             targetPublisher.set(swerveModuleStates);
             actualPublisher.set(actualStates);
@@ -273,9 +278,9 @@ public class SwerveDrivetrain extends SubsystemBase {
         rL.setDesiredState(swerveModuleStates[2]);
         rR.setDesiredState(swerveModuleStates[3]);
 
-        if(Robot.fullDashboard) {
+        if(debugMode) {
             SwerveModuleState[] actualStates = { fL.getState(), fR.getState(), rL.getState(), rR.getState()};
-            targetPublisher.set(swerveModuleStates);
+            actualPublisher.set(actualStates);
             chassisSpeedsStructPublisher.set(chassisSpeeds);
             targetPublisher.set(swerveModuleStates);
         }
@@ -333,7 +338,7 @@ public class SwerveDrivetrain extends SubsystemBase {
     }
 
     /**
-     * set the drivePace settings for the drivebase
+     * set the drivePace settings for the drivetrain
      *
      * @param drivePace the drivePace to set
      */
@@ -474,53 +479,107 @@ public class SwerveDrivetrain extends SubsystemBase {
     public double rLDriveTemp() { return rLDriveMotor.getTemp(); }
     public double rRDriveTemp() { return rRDriveMotor.getTemp(); }
 
-    public void updateShuffleboardDebug(String shuffleboardTabName) {
-
-        SmartDashboard.putData(shuffleboardTabName + "/FL Heading", builder -> {
+    /**
+     * Enables debug mode. Adds the following to the network table:
+     * <ul>
+     *     <li>Heading for each module (Gyro Widget)</li>
+     *     <li>Actual Swerve State (Elastic Widget)</li>
+     *     <li>Target Swerve State (Elastic Widget)</li>
+     *     <li>Actual Swerve State (AdvantageScope)</li>
+     *     <li>Target Swerve State (AdvantageScope)</li>
+     *     <li>Target Chassis Speed (AdvantageScope</li>
+     *     <li>Raw Encoder Readings</li>
+     *     <li>Raw Encoder Degrees</li>
+     *     <li>Raw Encoder Radians</li>
+     *     <li>Raw Drive Encoder</li>
+     * </ul>
+     */
+    public void enableDebugMode() {
+        debugMode = true;
+        SmartDashboard.putData("Swerve/FL Heading", builder -> {
             builder.setSmartDashboardType("Gyro");
             builder.addDoubleProperty("Value", fL::getTurningHeadingDegrees, null);
         });
-        SmartDashboard.putData(shuffleboardTabName + "/FR Heading", builder -> {
+        SmartDashboard.putData("Swerve/FR Heading", builder -> {
             builder.setSmartDashboardType("Gyro");
             builder.addDoubleProperty("Value", fR::getTurningHeadingDegrees, null);
         });
-        SmartDashboard.putData(shuffleboardTabName + "/RL Heading", builder -> {
+        SmartDashboard.putData("Swerve/RL Heading", builder -> {
             builder.setSmartDashboardType("Gyro");
             builder.addDoubleProperty("Value", rL::getTurningHeadingDegrees, null);
         });
-        SmartDashboard.putData(shuffleboardTabName + "/RR Heading", builder -> {
+        SmartDashboard.putData("Swerve/RR Heading", builder -> {
             builder.setSmartDashboardType("Gyro");
             builder.addDoubleProperty("Value", rR::getTurningHeadingDegrees, null);
         });
 
+        SmartDashboard.putData("Swerve/Actual Swerve State", new Sendable() {
+            @Override
+            public void initSendable(SendableBuilder builder) {
+                builder.setSmartDashboardType("SwerveDrive");
 
-        SmartDashboard.putNumber(shuffleboardTabName + "/FR Raw Degrees", fR.encoderDegrees());
-        SmartDashboard.putNumber(shuffleboardTabName + "/FL Raw Degrees", fL.encoderDegrees());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RR Raw Degrees", rR.encoderDegrees());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RL Raw Degrees", rL.encoderDegrees());
+                builder.addDoubleProperty("Front Left Angle", () -> fL.getTurningHeading(), null);
+                builder.addDoubleProperty("Front Left Velocity", () -> fL.getDriveVelocity(), null);
 
-        SmartDashboard.putNumber(shuffleboardTabName + "/FL Raw Encoder", fLEncoder.getTicks());
-        SmartDashboard.putNumber(shuffleboardTabName + "/FR Raw Encoder", fREncoder.getTicks());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RL Raw Encoder", rLEncoder.getTicks());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RR Raw Encoder", rREncoder.getTicks());
+                builder.addDoubleProperty("Front Right Angle", () -> fR.getTurningHeading(), null);
+                builder.addDoubleProperty("Front Right Velocity", () -> fR.getDriveVelocity(), null);
 
-        SmartDashboard.putNumber(shuffleboardTabName + "/FR Raw Radians", fR.getTurningHeading());
-        SmartDashboard.putNumber(shuffleboardTabName + "/FL Raw Radians", fL.getTurningHeading());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RR Raw Radians", rR.getTurningHeading());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RL Raw Radians", rL.getTurningHeading());
+                builder.addDoubleProperty("Back Left Angle", () -> rL.getTurningHeading(), null);
+                builder.addDoubleProperty("Back Left Velocity", () -> rL.getDriveVelocity(), null);
 
-        SmartDashboard.putNumber(shuffleboardTabName + "/FL Drive Encoder", fLDriveMotor.getPosition());
-        SmartDashboard.putNumber(shuffleboardTabName + "/FR Drive Encoder", fRDriveMotor.getPosition());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RL Drive Encoder", rLDriveMotor.getPosition());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RR Drive Encoder", rRDriveMotor.getPosition());
+                builder.addDoubleProperty("Back Right Angle", () -> rR.getTurningHeading(), null);
+                builder.addDoubleProperty("Back Right Velocity", () -> rR.getDriveVelocity(), null);
 
-        SmartDashboard.putNumber(shuffleboardTabName + "/FL Rot Output", fLTurnMotor.getOutput());
-        SmartDashboard.putNumber(shuffleboardTabName + "/FR Rot Output", fLTurnMotor.getOutput());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RL Rot Output", fLTurnMotor.getOutput());
-        SmartDashboard.putNumber(shuffleboardTabName + "/RR Rot Output", fLTurnMotor.getOutput());
+                builder.addDoubleProperty("Robot Angle", () -> Units.degreesToRadians(Robot.pigeon.get360Heading()), null);
+            }
+        });
 
+        SmartDashboard.putData("Swerve/Target Swerve State", new Sendable() {
+            @Override
+            public void initSendable(SendableBuilder builder) {
+                builder.setSmartDashboardType("SwerveDrive");
 
-        //TODO: Add target to shuffleboard
+                builder.addDoubleProperty("Front Left Angle", fL::getTargetAngle, null);
+                builder.addDoubleProperty("Front Left Velocity", fL::getTargetVelocity, null);
+
+                builder.addDoubleProperty("Front Right Angle", fR::getTargetAngle, null);
+                builder.addDoubleProperty("Front Right Velocity", fR::getTargetVelocity, null);
+
+                builder.addDoubleProperty("Back Left Angle", rL::getTargetAngle, null);
+                builder.addDoubleProperty("Back Left Velocity", rL::getTargetVelocity, null);
+
+                builder.addDoubleProperty("Back Right Angle", rR::getTargetAngle, null);
+                builder.addDoubleProperty("Back Right Velocity", rR::getTargetVelocity, null);
+
+                builder.addDoubleProperty("Robot Angle", () -> Units.degreesToRadians(Robot.pigeon.get360Heading()), null);
+            }
+        });
+    }
+    private void updateShuffleboardDebug() {
+        SmartDashboard.putNumber("Swerve/FR Raw Degrees", fR.encoderDegrees());
+        SmartDashboard.putNumber("Swerve/FL Raw Degrees", fL.encoderDegrees());
+        SmartDashboard.putNumber("Swerve/RR Raw Degrees", rR.encoderDegrees());
+        SmartDashboard.putNumber("Swerve/RL Raw Degrees", rL.encoderDegrees());
+
+        SmartDashboard.putNumber("Swerve/FL Raw Encoder", fLEncoder.getTicks());
+        SmartDashboard.putNumber("Swerve/FR Raw Encoder", fREncoder.getTicks());
+        SmartDashboard.putNumber("Swerve/RL Raw Encoder", rLEncoder.getTicks());
+        SmartDashboard.putNumber("Swerve/RR Raw Encoder", rREncoder.getTicks());
+
+        SmartDashboard.putNumber("Swerve/FR Raw Radians", fR.getTurningHeading());
+        SmartDashboard.putNumber("Swerve/FL Raw Radians", fL.getTurningHeading());
+        SmartDashboard.putNumber("Swerve/RR Raw Radians", rR.getTurningHeading());
+        SmartDashboard.putNumber("Swerve/RL Raw Radians", rL.getTurningHeading());
+
+        SmartDashboard.putNumber("Swerve/FL Drive Encoder", fLDriveMotor.getPosition());
+        SmartDashboard.putNumber("Swerve/FR Drive Encoder", fRDriveMotor.getPosition());
+        SmartDashboard.putNumber("Swerve/RL Drive Encoder", rLDriveMotor.getPosition());
+        SmartDashboard.putNumber("Swerve/RR Drive Encoder", rRDriveMotor.getPosition());
+
+        SmartDashboard.putNumber("Swerve/FL Rot Output", fLTurnMotor.getOutput());
+        SmartDashboard.putNumber("Swerve/FR Rot Output", fLTurnMotor.getOutput());
+        SmartDashboard.putNumber("Swerve/RL Rot Output", fLTurnMotor.getOutput());
+        SmartDashboard.putNumber("Swerve/RR Rot Output", fLTurnMotor.getOutput());
     }
 
     public SysIdRoutine getSysIdRoutine(String motors) {
